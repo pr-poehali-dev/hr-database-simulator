@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,31 @@ const Index = () => {
   const [userType, setUserType] = useState<'hr' | 'participant' | 'admin' | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
+  const [participantCode, setParticipantCode] = useState('');
+  const [currentSimulator, setCurrentSimulator] = useState<'typing' | 'spatial' | 'reaction' | null>(null);
+  const [simulatorResults, setSimulatorResults] = useState<{typing?: any, spatial?: any, reaction?: any}>({});
+  
+  // Typing test state
+  const [typingText] = useState('Быстрое развитие технологий требует от специалистов постоянного обучения и адаптации к новым условиям работы. Современные компании ценят сотрудников, которые готовы к изменениям и способны эффективно работать в команде.');
+  const [typedText, setTypedText] = useState('');
+  const [typingStartTime, setTypingStartTime] = useState<number | null>(null);
+  const [typingTimeLeft, setTypingTimeLeft] = useState(60);
+  const [typingActive, setTypingActive] = useState(false);
+  
+  // Spatial test state
+  const [spatialLevel, setSpatialLevel] = useState(1);
+  const [spatialScore, setSpatialScore] = useState(0);
+  const [currentSpatialTask, setCurrentSpatialTask] = useState<any>(null);
+  const [spatialTimeLeft, setSpatialTimeLeft] = useState(180);
+  const [spatialActive, setSpatialActive] = useState(false);
+  
+  // Reaction test state
+  const [reactionPhase, setReactionPhase] = useState<'waiting' | 'ready' | 'react' | 'result'>('waiting');
+  const [reactionStartTime, setReactionStartTime] = useState<number | null>(null);
+  const [reactionTimes, setReactionTimes] = useState<number[]>([]);
+  const [reactionRound, setReactionRound] = useState(1);
+  const [reactionActive, setReactionActive] = useState(false);
+
   const [participants] = useState([
     { id: 'P001', name: 'Иванов И.И.', birthDate: '1990-05-15', interviewScore: 85, simulatorResults: { typing: 'хороший', spatial: 'средний', reaction: 'хороший' }, stressTest: 'прошел', ranking: 1 },
     { id: 'P002', name: 'Петрова А.С.', birthDate: '1992-08-22', interviewScore: 78, simulatorResults: { typing: 'средний', spatial: 'хороший', reaction: 'средний' }, stressTest: 'прошел', ranking: 2 },
@@ -30,6 +55,183 @@ const Index = () => {
     setUserType(null);
     setIsAuthenticated(false);
     setCurrentView('dashboard');
+    setCurrentSimulator(null);
+    setParticipantCode('');
+    setSimulatorResults({});
+  };
+
+  // Typing test functions
+  const startTypingTest = () => {
+    setTypingActive(true);
+    setTypingStartTime(Date.now());
+    setTypedText('');
+    setTypingTimeLeft(60);
+    
+    const timer = setInterval(() => {
+      setTypingTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          finishTypingTest();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const finishTypingTest = () => {
+    setTypingActive(false);
+    const accuracy = calculateTypingAccuracy();
+    const wpm = calculateWPM();
+    const result = { accuracy, wpm, grade: getTypingGrade(wpm, accuracy) };
+    setSimulatorResults(prev => ({ ...prev, typing: result }));
+  };
+
+  const calculateTypingAccuracy = () => {
+    if (!typedText) return 0;
+    let correct = 0;
+    for (let i = 0; i < Math.min(typedText.length, typingText.length); i++) {
+      if (typedText[i] === typingText[i]) correct++;
+    }
+    return Math.round((correct / typingText.length) * 100);
+  };
+
+  const calculateWPM = () => {
+    if (!typingStartTime) return 0;
+    const timeElapsed = (Date.now() - typingStartTime) / 1000 / 60;
+    const wordsTyped = typedText.split(' ').length;
+    return Math.round(wordsTyped / timeElapsed);
+  };
+
+  const getTypingGrade = (wpm: number, accuracy: number) => {
+    if (wpm >= 40 && accuracy >= 95) return 'отлично';
+    if (wpm >= 30 && accuracy >= 90) return 'хорошо';
+    if (wpm >= 20 && accuracy >= 85) return 'средне';
+    return 'ниже среднего';
+  };
+
+  // Spatial test functions
+  const startSpatialTest = () => {
+    setSpatialActive(true);
+    setSpatialLevel(1);
+    setSpatialScore(0);
+    setSpatialTimeLeft(180);
+    generateSpatialTask();
+    
+    const timer = setInterval(() => {
+      setSpatialTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          finishSpatialTest();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const generateSpatialTask = () => {
+    const shapes = ['circle', 'square', 'triangle'];
+    const colors = ['red', 'blue', 'green', 'yellow'];
+    const positions = [
+      { x: 20, y: 20 }, { x: 80, y: 20 }, { x: 50, y: 50 },
+      { x: 20, y: 80 }, { x: 80, y: 80 }
+    ];
+    
+    const task = {
+      shapes: positions.slice(0, spatialLevel + 2).map((pos, i) => ({
+        id: i,
+        shape: shapes[Math.floor(Math.random() * shapes.length)],
+        color: colors[Math.floor(Math.random() * colors.length)],
+        position: pos,
+        size: 20 + Math.random() * 20
+      })),
+      question: `Найдите ${shapes[Math.floor(Math.random() * shapes.length)]} фигуру`,
+      correctAnswer: Math.floor(Math.random() * (spatialLevel + 2))
+    };
+    
+    setCurrentSpatialTask(task);
+  };
+
+  const handleSpatialAnswer = (answerId: number) => {
+    if (answerId === currentSpatialTask.correctAnswer) {
+      setSpatialScore(prev => prev + 10);
+      setSpatialLevel(prev => Math.min(prev + 1, 10));
+    }
+    
+    if (spatialLevel < 10) {
+      generateSpatialTask();
+    } else {
+      finishSpatialTest();
+    }
+  };
+
+  const finishSpatialTest = () => {
+    setSpatialActive(false);
+    const grade = getSpatialGrade(spatialScore);
+    setSimulatorResults(prev => ({ ...prev, spatial: { score: spatialScore, level: spatialLevel, grade } }));
+  };
+
+  const getSpatialGrade = (score: number) => {
+    if (score >= 80) return 'отлично';
+    if (score >= 60) return 'хорошо';
+    if (score >= 40) return 'средне';
+    return 'ниже среднего';
+  };
+
+  // Reaction test functions
+  const startReactionTest = () => {
+    setReactionActive(true);
+    setReactionTimes([]);
+    setReactionRound(1);
+    startReactionRound();
+  };
+
+  const startReactionRound = () => {
+    setReactionPhase('waiting');
+    const delay = 1000 + Math.random() * 3000;
+    
+    setTimeout(() => {
+      setReactionPhase('react');
+      setReactionStartTime(Date.now());
+    }, delay);
+  };
+
+  const handleReactionClick = () => {
+    if (reactionPhase === 'react' && reactionStartTime) {
+      const reactionTime = Date.now() - reactionStartTime;
+      setReactionTimes(prev => [...prev, reactionTime]);
+      setReactionPhase('result');
+      
+      setTimeout(() => {
+        if (reactionRound < 5) {
+          setReactionRound(prev => prev + 1);
+          startReactionRound();
+        } else {
+          finishReactionTest();
+        }
+      }, 1500);
+    }
+  };
+
+  const finishReactionTest = () => {
+    setReactionActive(false);
+    const avgTime = reactionTimes.reduce((sum, time) => sum + time, 0) / reactionTimes.length;
+    const grade = getReactionGrade(avgTime);
+    setSimulatorResults(prev => ({ ...prev, reaction: { avgTime: Math.round(avgTime), times: reactionTimes, grade } }));
+  };
+
+  const getReactionGrade = (avgTime: number) => {
+    if (avgTime <= 250) return 'отлично';
+    if (avgTime <= 350) return 'хорошо';
+    if (avgTime <= 500) return 'средне';
+    return 'ниже среднего';
+  };
+
+  const startParticipantTesting = () => {
+    if (participantCode) {
+      setCurrentSimulator('typing');
+    }
   };
 
   if (!isAuthenticated) {
@@ -401,77 +603,396 @@ const Index = () => {
   }
 
   if (userType === 'participant') {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white shadow-sm border-b">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-4">
-              <div className="flex items-center space-x-4">
-                <Icon name="User" size={24} className="text-blue-800" />
-                <h1 className="text-xl font-semibold text-gray-900">Портал участника</h1>
+    if (currentSimulator === null) {
+      return (
+        <div className="min-h-screen bg-gray-50">
+          <header className="bg-white shadow-sm border-b">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center py-4">
+                <div className="flex items-center space-x-4">
+                  <Icon name="User" size={24} className="text-blue-800" />
+                  <h1 className="text-xl font-semibold text-gray-900">Портал участника</h1>
+                </div>
+                <Button onClick={handleLogout} variant="outline" size="sm">
+                  <Icon name="LogOut" className="mr-2" size={16} />
+                  Выход
+                </Button>
               </div>
-              <Button onClick={handleLogout} variant="outline" size="sm">
-                <Icon name="LogOut" className="mr-2" size={16} />
-                Выход
-              </Button>
             </div>
-          </div>
-        </header>
+          </header>
 
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Card>
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl">Добро пожаловать в систему тестирования</CardTitle>
-              <p className="text-gray-600">Введите ваш код для начала прохождения тестов</p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="participantCode">Код участника</Label>
-                <Input id="participantCode" placeholder="Введите ваш код (например: P001)" className="text-center text-lg" />
-              </div>
-              
-              <Button className="w-full bg-blue-800 hover:bg-blue-900 text-lg py-3">
-                <Icon name="Play" className="mr-2" size={20} />
-                Начать тестирование
-              </Button>
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <Card>
+              <CardHeader className="text-center">
+                <CardTitle className="text-2xl">Добро пожаловать в систему тестирования</CardTitle>
+                <p className="text-gray-600">Введите ваш код для начала прохождения тестов</p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="participantCode">Код участника</Label>
+                  <Input 
+                    id="participantCode" 
+                    placeholder="Введите ваш код (например: P001)" 
+                    className="text-center text-lg"
+                    value={participantCode}
+                    onChange={(e) => setParticipantCode(e.target.value)}
+                  />
+                </div>
+                
+                <Button 
+                  onClick={startParticipantTesting}
+                  disabled={!participantCode}
+                  className="w-full bg-blue-800 hover:bg-blue-900 text-lg py-3"
+                >
+                  <Icon name="Play" className="mr-2" size={20} />
+                  Начать тестирование
+                </Button>
 
-              <div className="border-t pt-6">
-                <h3 className="font-semibold mb-4">Этапы тестирования:</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                      <span className="text-blue-800 font-semibold">1</span>
+                <div className="border-t pt-6">
+                  <h3 className="font-semibold mb-4">Этапы тестирования:</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-800 font-semibold">1</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Тест скорости печати</p>
+                        <p className="text-sm text-gray-600">Оценка владения клавиатурой</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">Тест скорости печати</p>
-                      <p className="text-sm text-gray-600">Оценка владения клавиатурой</p>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                        <span className="text-gray-600 font-semibold">2</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Пространственное мышление</p>
+                        <p className="text-sm text-gray-600">Ориентирование в пространстве</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                      <span className="text-gray-600 font-semibold">2</span>
-                    </div>
-                    <div>
-                      <p className="font-medium">Пространственное мышление</p>
-                      <p className="text-sm text-gray-600">Ориентирование в пространстве</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                      <span className="text-gray-600 font-semibold">3</span>
-                    </div>
-                    <div>
-                      <p className="font-medium">Тест скорости реакции</p>
-                      <p className="text-sm text-gray-600">Зрительная и моторная реакция</p>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                        <span className="text-gray-600 font-semibold">3</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Тест скорости реакции</p>
+                        <p className="text-sm text-gray-600">Зрительная и моторная реакция</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
+
+    // Typing Test Simulator
+    if (currentSimulator === 'typing') {
+      return (
+        <div className="min-h-screen bg-gray-50">
+          <header className="bg-white shadow-sm border-b">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center py-4">
+                <div className="flex items-center space-x-4">
+                  <Icon name="Keyboard" size={24} className="text-blue-800" />
+                  <h1 className="text-xl font-semibold text-gray-900">Тест скорости печати</h1>
+                </div>
+                <div className="text-lg font-semibold text-blue-800">
+                  {typingTimeLeft}с
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <Card>
+              <CardHeader className="text-center">
+                <CardTitle>Введите текст максимально быстро и точно</CardTitle>
+                <Progress value={((60 - typingTimeLeft) / 60) * 100} className="mt-4" />
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="bg-gray-100 p-6 rounded-lg">
+                  <p className="text-lg leading-relaxed font-mono">
+                    {typingText.split('').map((char, index) => (
+                      <span
+                        key={index}
+                        className={
+                          index < typedText.length
+                            ? typedText[index] === char
+                              ? 'bg-green-200 text-green-800'
+                              : 'bg-red-200 text-red-800'
+                            : index === typedText.length
+                            ? 'bg-blue-200'
+                            : 'text-gray-600'
+                        }
+                      >
+                        {char}
+                      </span>
+                    ))}
+                  </p>
+                </div>
+
+                {!typingActive && !simulatorResults.typing && (
+                  <Button 
+                    onClick={startTypingTest}
+                    className="w-full bg-blue-800 hover:bg-blue-900 text-lg py-3"
+                  >
+                    <Icon name="Play" className="mr-2" size={20} />
+                    Начать тест
+                  </Button>
+                )}
+
+                {typingActive && (
+                  <Textarea
+                    value={typedText}
+                    onChange={(e) => setTypedText(e.target.value)}
+                    placeholder="Начните печатать здесь..."
+                    className="min-h-32 text-lg font-mono"
+                    autoFocus
+                  />
+                )}
+
+                {simulatorResults.typing && (
+                  <div className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <Card>
+                        <CardContent className="p-4 text-center">
+                          <p className="text-2xl font-bold text-blue-800">{simulatorResults.typing.wpm}</p>
+                          <p className="text-sm text-gray-600">слов/мин</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4 text-center">
+                          <p className="text-2xl font-bold text-green-800">{simulatorResults.typing.accuracy}%</p>
+                          <p className="text-sm text-gray-600">точность</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4 text-center">
+                          <Badge className="text-lg py-1">{simulatorResults.typing.grade}</Badge>
+                        </CardContent>
+                      </Card>
+                    </div>
+                    <Button 
+                      onClick={() => setCurrentSimulator('spatial')}
+                      className="w-full bg-blue-800 hover:bg-blue-900"
+                    >
+                      Продолжить к тесту пространственного мышления
+                      <Icon name="ArrowRight" className="ml-2" size={18} />
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      );
+    }
+
+    // Spatial Test Simulator  
+    if (currentSimulator === 'spatial') {
+      return (
+        <div className="min-h-screen bg-gray-50">
+          <header className="bg-white shadow-sm border-b">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center py-4">
+                <div className="flex items-center space-x-4">
+                  <Icon name="Box" size={24} className="text-blue-800" />
+                  <h1 className="text-xl font-semibold text-gray-900">Пространственное мышление</h1>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <div className="text-lg font-semibold text-blue-800">
+                    {Math.floor(spatialTimeLeft / 60)}:{(spatialTimeLeft % 60).toString().padStart(2, '0')}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Балл: {spatialScore} | Уровень: {spatialLevel}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <Card>
+              <CardHeader className="text-center">
+                <CardTitle>Найдите фигуру согласно заданию</CardTitle>
+                <Progress value={(spatialLevel / 10) * 100} className="mt-4" />
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {!spatialActive && !simulatorResults.spatial && (
+                  <Button 
+                    onClick={startSpatialTest}
+                    className="w-full bg-blue-800 hover:bg-blue-900 text-lg py-3"
+                  >
+                    <Icon name="Play" className="mr-2" size={20} />
+                    Начать тест
+                  </Button>
+                )}
+
+                {spatialActive && currentSpatialTask && (
+                  <div className="space-y-6">
+                    <div className="text-center">
+                      <h3 className="text-xl font-semibold mb-4">{currentSpatialTask.question}</h3>
+                    </div>
+                    
+                    <div className="relative w-full h-96 bg-white border-2 border-gray-300 rounded-lg">
+                      {currentSpatialTask.shapes.map((shape: any) => (
+                        <div
+                          key={shape.id}
+                          onClick={() => handleSpatialAnswer(shape.id)}
+                          className="absolute cursor-pointer hover:opacity-75 transition-opacity"
+                          style={{
+                            left: `${shape.position.x}%`,
+                            top: `${shape.position.y}%`,
+                            width: shape.size,
+                            height: shape.size,
+                            backgroundColor: shape.color,
+                            borderRadius: shape.shape === 'circle' ? '50%' : '0%',
+                            clipPath: shape.shape === 'triangle' ? 'polygon(50% 0%, 0% 100%, 100% 100%)' : 'none'
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {simulatorResults.spatial && (
+                  <div className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <Card>
+                        <CardContent className="p-4 text-center">
+                          <p className="text-2xl font-bold text-blue-800">{simulatorResults.spatial.score}</p>
+                          <p className="text-sm text-gray-600">очков</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4 text-center">
+                          <p className="text-2xl font-bold text-green-800">{simulatorResults.spatial.level}</p>
+                          <p className="text-sm text-gray-600">уровень</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4 text-center">
+                          <Badge className="text-lg py-1">{simulatorResults.spatial.grade}</Badge>
+                        </CardContent>
+                      </Card>
+                    </div>
+                    <Button 
+                      onClick={() => setCurrentSimulator('reaction')}
+                      className="w-full bg-blue-800 hover:bg-blue-900"
+                    >
+                      Продолжить к тесту реакции
+                      <Icon name="ArrowRight" className="ml-2" size={18} />
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      );
+    }
+
+    // Reaction Test Simulator
+    if (currentSimulator === 'reaction') {
+      return (
+        <div className="min-h-screen bg-gray-50">
+          <header className="bg-white shadow-sm border-b">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center py-4">
+                <div className="flex items-center space-x-4">
+                  <Icon name="Zap" size={24} className="text-blue-800" />
+                  <h1 className="text-xl font-semibold text-gray-900">Тест скорости реакции</h1>
+                </div>
+                <div className="text-lg font-semibold text-blue-800">
+                  Раунд: {reactionRound}/5
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <Card>
+              <CardHeader className="text-center">
+                <CardTitle>Нажмите как можно быстрее, когда экран станет зеленым</CardTitle>
+                <p className="text-gray-600">НЕ нажимайте раньше времени!</p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {!reactionActive && !simulatorResults.reaction && (
+                  <Button 
+                    onClick={startReactionTest}
+                    className="w-full bg-blue-800 hover:bg-blue-900 text-lg py-3"
+                  >
+                    <Icon name="Play" className="mr-2" size={20} />
+                    Начать тест
+                  </Button>
+                )}
+
+                {reactionActive && (
+                  <div 
+                    onClick={handleReactionClick}
+                    className={`
+                      w-full h-96 rounded-lg cursor-pointer flex items-center justify-center text-2xl font-bold transition-all duration-300
+                      ${reactionPhase === 'waiting' ? 'bg-red-100 text-red-800' : ''}
+                      ${reactionPhase === 'react' ? 'bg-green-400 text-white' : ''}
+                      ${reactionPhase === 'result' ? 'bg-blue-100 text-blue-800' : ''}
+                    `}
+                  >
+                    {reactionPhase === 'waiting' && 'Ждите...'}
+                    {reactionPhase === 'react' && 'НАЖМИТЕ СЕЙЧАС!'}
+                    {reactionPhase === 'result' && `${reactionTimes[reactionTimes.length - 1]}мс`}
+                  </div>
+                )}
+
+                {reactionTimes.length > 0 && reactionActive && (
+                  <div className="space-y-2">
+                    <h4 className="font-semibold">Ваши результаты:</h4>
+                    <div className="grid gap-2 grid-cols-5">
+                      {reactionTimes.map((time, index) => (
+                        <div key={index} className="text-center p-2 bg-gray-100 rounded">
+                          {time}мс
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {simulatorResults.reaction && (
+                  <div className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Card>
+                        <CardContent className="p-4 text-center">
+                          <p className="text-2xl font-bold text-blue-800">{simulatorResults.reaction.avgTime}мс</p>
+                          <p className="text-sm text-gray-600">средняя реакция</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4 text-center">
+                          <Badge className="text-lg py-1">{simulatorResults.reaction.grade}</Badge>
+                        </CardContent>
+                      </Card>
+                    </div>
+                    
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                      <Icon name="CheckCircle" size={48} className="text-green-600 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-green-800 mb-2">Тестирование завершено!</h3>
+                      <p className="text-green-700">Все ваши результаты сохранены в системе</p>
+                      <Button 
+                        onClick={handleLogout}
+                        className="mt-4 bg-green-600 hover:bg-green-700"
+                      >
+                        Завершить сессию
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      );
+    }
   }
 
   if (userType === 'admin') {
